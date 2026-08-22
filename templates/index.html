@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111827">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="投資雷達">
+  <link rel="manifest" href="/static/manifest.json">
+  <title>我的投資雷達</title>
+  <style>
+    :root{
+      color-scheme:light dark;
+      --bg:#f5f7fb;--card:#fff;--text:#172033;--muted:#6b778c;--border:#e1e7ef;
+      --accent:#1f2937;--up:#d84b61;--down:#148e6c;
+    }
+    @media(prefers-color-scheme:dark){
+      :root{--bg:#0b0f17;--card:#131a24;--text:#eef3fb;--muted:#97a4b7;--border:#263143;--accent:#edf2f7}
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    .app{max-width:980px;margin:auto;padding:18px 14px 34px}
+    h1{font-size:25px;margin:0 0 4px}.muted{color:var(--muted)}
+    .top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:16px}
+    .badge{border:1px solid var(--border);background:var(--card);border-radius:999px;padding:8px 11px;font-size:12px}
+    .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
+    .label{font-size:12px;color:var(--muted);margin-bottom:6px}.big{font-size:23px;font-weight:800}
+    .tabs{display:flex;gap:8px;margin:14px 0}
+    button{font:inherit}.tab,.btn{min-height:44px;border-radius:11px;border:1px solid var(--border);background:var(--card);color:var(--text);padding:10px 13px;font-weight:700}
+    .tab.active,.btn.primary{background:var(--accent);color:var(--bg);border-color:transparent}
+    .panel{display:none}.panel.active{display:block}
+    .layout{display:grid;grid-template-columns:1.6fr .8fr;gap:12px}
+    .stock{display:grid;grid-template-columns:1.5fr .85fr .85fr auto;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
+    .stock:last-child{border-bottom:0}.name{font-weight:800}.ticker{font-size:12px;color:var(--muted);margin-top:3px}
+    .right{text-align:right}.up{color:var(--up)}.down{color:var(--down)}
+    input{width:100%;font-size:16px;min-height:44px;padding:10px 11px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text)}
+    .form{display:grid;gap:8px}.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .news{padding:13px 0;border-bottom:1px solid var(--border)}.news:last-child{border-bottom:0}.news h3{font-size:15px;line-height:1.45;margin:0 0 6px}.news a{color:inherit;text-decoration:none}.news-meta{font-size:11px;color:var(--muted)}
+    .remove{border:0;background:transparent;color:var(--muted);font-size:22px;min-width:44px;min-height:44px;border-radius:8px}
+    .empty{text-align:center;color:var(--muted);padding:24px 8px}.status{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5}
+    .alloc{height:7px;background:var(--border);border-radius:99px;overflow:hidden;margin-top:6px}.alloc i{display:block;height:100%;background:#8894a7}
+    @media(max-width:720px){.summary{grid-template-columns:1fr}.layout{grid-template-columns:1fr}.stock{grid-template-columns:1.15fr .75fr .75fr auto}.big{font-size:21px}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div><h1>我的投資雷達</h1><div class="muted">自選股 · 資產配置 · 專屬新聞</div></div>
+    <div class="badge">免費資料模式</div>
+  </div>
+
+  <div class="summary">
+    <div class="card"><div class="label">總資產</div><div id="total" class="big">0</div><div class="status">依持有市值加總</div></div>
+    <div class="card"><div class="label">今日損益</div><div id="pnl" class="big">0</div><div id="pnlPct" class="status">0.00%</div></div>
+    <div class="card"><div class="label">我的最愛</div><div id="count" class="big">0 檔</div><div class="status">新聞只追蹤這些股票</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-target="portfolio">資產配置</button>
+    <button class="tab" data-target="news">專屬新聞</button>
+  </div>
+
+  <section id="portfolio" class="panel active">
+    <div class="layout">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+          <b>今日自選股</b>
+          <button id="refresh" class="btn">更新報價</button>
+        </div>
+        <div id="stocks"></div>
+      </div>
+      <div class="card">
+        <b>加入股票</b>
+        <form id="form" class="form" style="margin-top:10px">
+          <div class="row2">
+            <input id="symbol" placeholder="代號，例如 2330.TW" required>
+            <input id="name" placeholder="名稱，例如 台積電" required>
+          </div>
+          <div class="row2">
+            <input id="shares" type="number" min="0" step="1" placeholder="股數">
+            <input id="cost" type="number" min="0" step="0.01" placeholder="平均成本">
+          </div>
+          <button class="btn primary" type="submit">＋ 加入我的最愛</button>
+        </form>
+        <div class="status">
+          台股請用 <b>2330.TW</b>；美股用 <b>ASML</b>；印尼通常為 <b>POWR.JK</b>；泰股/馬股代碼依 Yahoo Finance 格式。
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="news" class="panel">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+        <b>只屬於你的投資新聞</b>
+        <button id="refreshNews" class="btn">更新新聞</button>
+      </div>
+      <div id="newsList"></div>
+      <div class="status">來源為 Google News 公開 RSS 搜尋；第一版不使用付費新聞 API。</div>
+    </div>
+  </section>
+</div>
+
+<script>
+const KEY='investmentRadar.watchlist.v1';
+let watch=JSON.parse(localStorage.getItem(KEY)||'null')||[
+ {symbol:'2330.TW',name:'台積電',shares:1000,cost:1000,price:null,changePct:null},
+ {symbol:'3130.TWO',name:'一零四',shares:1000,cost:200,price:null,changePct:null},
+ {symbol:'5287.TWO',name:'數字科技',shares:1000,cost:150,price:null,changePct:null}
+];
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function save(){localStorage.setItem(KEY,JSON.stringify(watch))}
+function money(n){return Number.isFinite(n)?Math.round(n).toLocaleString('zh-TW'):'—'}
+
+function render(){
+  const total=watch.reduce((a,s)=>a+((s.price||s.cost||0)*(s.shares||0)),0);
+  const pnl=watch.reduce((a,s)=>{
+    const mv=(s.price||s.cost||0)*(s.shares||0);
+    return a+mv*((s.changePct||0)/100);
+  },0);
+  $('#total').textContent='NT$ '+money(total);
+  $('#pnl').textContent=(pnl>=0?'+':'')+'NT$ '+money(pnl);
+  $('#pnl').className='big '+(pnl>0?'up':pnl<0?'down':'');
+  $('#pnlPct').textContent=(total? pnl/total*100:0).toFixed(2)+'%';
+  $('#count').textContent=watch.length+' 檔';
+
+  const holder=$('#stocks'); holder.innerHTML='';
+  if(!watch.length){holder.innerHTML='<div class="empty">尚未加入股票</div>';return;}
+  watch.forEach((s,i)=>{
+    const mv=(s.price||s.cost||0)*(s.shares||0);
+    const alloc=total?mv/total*100:0;
+    const row=document.createElement('div'); row.className='stock';
+    row.innerHTML=`
+      <div><div class="name">${esc(s.name)}</div><div class="ticker">${esc(s.symbol)} · ${s.shares||0} 股 · 配置 ${alloc.toFixed(1)}%</div><div class="alloc"><i style="width:${Math.min(100,alloc)}%"></i></div></div>
+      <div class="right"><b>${s.price==null?'—':money(s.price)}</b><div class="ticker">成本 ${money(s.cost||0)}</div></div>
+      <div class="right ${s.changePct>0?'up':s.changePct<0?'down':''}"><b>${s.changePct==null?'—':((s.changePct>0?'+':'')+s.changePct.toFixed(2)+'%')}</b></div>
+      <button class="remove" data-i="${i}" aria-label="移除 ${esc(s.name)}">×</button>`;
+    holder.appendChild(row);
+  });
+  document.querySelectorAll('.remove').forEach(b=>b.addEventListener('click',()=>{
+    watch.splice(Number(b.dataset.i),1);save();render();
+  }));
+}
+
+async function refreshQuotes(){
+  $('#refresh').disabled=true; $('#refresh').textContent='更新中…';
+  for(const s of watch){
+    try{
+      const r=await fetch('/api/quote?symbol='+encodeURIComponent(s.symbol));
+      if(!r.ok) continue;
+      const d=await r.json();
+      if(Number.isFinite(d.price)) s.price=d.price;
+      if(Number.isFinite(d.changePct)) s.changePct=d.changePct;
+    }catch(e){}
+    render();
+  }
+  save(); $('#refresh').disabled=false; $('#refresh').textContent='更新報價';
+}
+
+async function refreshNews(){
+  const box=$('#newsList'); box.innerHTML='<div class="empty">更新新聞中…</div>';
+  $('#refreshNews').disabled=true;
+  const all=[];
+  for(const s of watch){
+    try{
+      const q=(s.name||'')+' '+s.symbol.replace(/\.(TW|TWO|JK|BK|KL)$/,'');
+      const r=await fetch('/api/news?q='+encodeURIComponent(q));
+      const d=await r.json();
+      (d.items||[]).slice(0,6).forEach(n=>all.push({...n,stock:s.name}));
+    }catch(e){}
+  }
+  const seen=new Set();
+  const unique=all.filter(n=>{const k=n.title; if(seen.has(k)) return false; seen.add(k); return true;}).slice(0,30);
+  box.innerHTML='';
+  if(!unique.length) box.innerHTML='<div class="empty">目前找不到自選股相關新聞</div>';
+  unique.forEach(n=>{
+    const div=document.createElement('article'); div.className='news';
+    div.innerHTML=`<div class="ticker">${esc(n.stock)}</div><h3><a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.title)}</a></h3><div class="news-meta">${esc(n.source||'Google News')} · ${esc(n.published||'')}</div>`;
+    box.appendChild(div);
+  });
+  $('#refreshNews').disabled=false;
+}
+
+$('#form').addEventListener('submit',e=>{
+  e.preventDefault();
+  const symbol=$('#symbol').value.trim().toUpperCase();
+  const name=$('#name').value.trim();
+  const shares=Math.max(0,Number($('#shares').value||0));
+  const cost=Math.max(0,Number($('#cost').value||0));
+  if(!symbol||!name) return;
+  const ex=watch.find(x=>x.symbol===symbol);
+  if(ex){ex.name=name;ex.shares=shares;ex.cost=cost}else watch.push({symbol,name,shares,cost,price:null,changePct:null});
+  save(); e.target.reset(); render(); refreshQuotes();
+});
+$('#refresh').addEventListener('click',refreshQuotes);
+$('#refreshNews').addEventListener('click',refreshNews);
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); $('#'+b.dataset.target).classList.add('active');
+  if(b.dataset.target==='news') refreshNews();
+}));
+if('serviceWorker' in navigator) navigator.serviceWorker.register('/static/sw.js').catch(()=>{});
+render();
+refreshQuotes();
+</script>
+</body>
+</html>
